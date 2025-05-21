@@ -3,10 +3,11 @@ import PatientCard from "./components/patientCard";
 import PatientModal from "./components/patientModal";
 import { initialPatients } from "./Data/dummyData";
 import { PGlite } from "@electric-sql/pglite";
+import { toCamelCase } from "./utils/LowercaseToCamelCase";
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [patients, setPatients] = useState(initialPatients);
+  const [patients, setPatients] = useState([]);
   const [query, setQuery] = useState("");
   const [db, setDb] = useState(null);
   const [isDbReady, setIsDbReady] = useState(false);
@@ -24,7 +25,6 @@ function App() {
   };
 
   const savePatient = async (newPatient) => {
-    setPatients([...patients, newPatient]);
     setIsModalOpen(false);
 
     if (db && isDbReady) {
@@ -50,32 +50,21 @@ function App() {
     `);
   };
 
-  const addDummyValues = async () => {
-    initialPatients.forEach(async (patient) => {
-      await feedData(patient);
-    });
-  };
-
   const feedData = async (patientData) => {
-    console.log(patientData);
-    const result = await db.exec(
-      `SELECT * FROM patients WHERE id = ${patientData.id};`
-    );
-    if (result) throw new Error("Id exists");
-
     try {
       await db.exec(`
-        INSERT INTO patients (id, firstName, lastName, dateOfBirth, gender, contactNumber, email)
+        INSERT INTO patients (firstName, lastName, dateOfBirth, gender, contactNumber, email)
         VALUES (
-           ${patientData.id}, 
           '${patientData.firstName}', 
           '${patientData.lastName}', 
-          '${patientData.dateOfBirth.toString()}', 
+          '${patientData.dateOfBirth}', 
           '${patientData.gender}', 
-          '${patientData.contactNumber.toString()}', 
+          '${patientData.contactNumber}', 
           '${patientData.email}'
         );
       `);
+
+      setPatients([...patients, patientData]);
       console.log(
         `Patient ${patientData.firstName} ${patientData.lastName} added to database`
       );
@@ -88,7 +77,7 @@ function App() {
   useEffect(() => {
     const initDb = async () => {
       try {
-        const dbInstance = new PGlite("idb://patient-db");
+        const dbInstance = new PGlite("idb://patient-db-test1");
         await dbInstance.waitReady;
         setDb(dbInstance);
 
@@ -103,19 +92,34 @@ function App() {
     initDb();
   }, []);
 
+  const updatePatients = async () => {
+    if (!db) return;
+
+    try {
+      const res = await db.exec("SELECT * FROM patients;");
+
+      const patientsList = res[0].rows.map((row) => row );
+      
+      console.log(patientsList , res);
+      
+      setPatients(patientsList);
+    } catch (error) {
+      console.error("Error fetching patients:", error);
+    }
+  };
+
   useEffect(() => {
     const feedData = async () => {
       const tableCreated = await addOrCheckTable();
-
-      if (tableCreated) {
-        await addDummyValues();
-      }
     };
 
-    if (db) {
+    if (isDbReady) {
       feedData();
+      updatePatients();
     }
-  }, [isDbReady]);
+  }, [db, isDbReady]);
+
+  useEffect(() => {}, []);
 
   return (
     <div className="app-container">
