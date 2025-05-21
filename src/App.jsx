@@ -3,12 +3,11 @@ import PatientCard from "./components/patientCard";
 import PatientModal from "./components/patientModal";
 import { initialPatients } from "./Data/dummyData";
 import { PGlite } from "@electric-sql/pglite";
-import { toCamelCase } from "./utils/LowercaseToCamelCase";
 
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [patients, setPatients] = useState([]);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState("SELECT * FROM patients;");
   const [db, setDb] = useState(null);
   const [isDbReady, setIsDbReady] = useState(false);
 
@@ -65,6 +64,10 @@ function App() {
       `);
 
       setPatients([...patients, patientData]);
+      
+      //localSTorage for multiple tab updates
+      localStorage.setItem('newPatient', JSON.stringify(patientData));
+
       console.log(
         `Patient ${patientData.firstName} ${patientData.lastName} added to database`
       );
@@ -89,6 +92,14 @@ function App() {
       }
     };
 
+    const autoRefreshOnDataUpdates = (event) => {
+      if (event.key === "newPatient") {
+        window.location.reload(); // Corrected the typo here
+      }
+    };
+
+    window.addEventListener("storage", autoRefreshOnDataUpdates);
+
     initDb();
   }, []);
 
@@ -96,12 +107,8 @@ function App() {
     if (!db) return;
 
     try {
-      const res = await db.exec("SELECT * FROM patients;");
-
-      const patientsList = res[0].rows.map((row) => row );
-      
-      console.log(patientsList , res);
-      
+      const res = await db.exec(query);
+      const patientsList = res[0].rows.map((row) => row);
       setPatients(patientsList);
     } catch (error) {
       console.error("Error fetching patients:", error);
@@ -117,9 +124,7 @@ function App() {
       feedData();
       updatePatients();
     }
-  }, [db, isDbReady]);
-
-  useEffect(() => {}, []);
+  }, [db, isDbReady, query]);
 
   return (
     <div className="app-container">
