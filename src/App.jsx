@@ -7,7 +7,7 @@ import { PGlite } from "@electric-sql/pglite";
 function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [patients, setPatients] = useState([]);
-  const [query, setQuery] = useState("SELECT * FROM patients;");
+  const [query, setQuery] = useState("");
   const [db, setDb] = useState(null);
   const [isDbReady, setIsDbReady] = useState(false);
 
@@ -15,8 +15,16 @@ function App() {
     setQuery(e.target.value);
   };
 
-  const executeQuery = () => {
-    console.log(query);
+  const executeQuery = async () => {
+    if (!db) return;
+
+    try {
+      const res = await db.exec(query);
+      const patientsList = res[0].rows.map((row) => row);
+      setPatients(patientsList);
+    } catch (error) {
+      alert("Error fetching patients:", error);
+    }
   };
 
   const closeModal = () => {
@@ -107,24 +115,24 @@ function App() {
     if (!db) return;
 
     try {
-      const res = await db.exec(query);
+      const res = await db.exec("SELECT * FROM patients;");
       const patientsList = res[0].rows.map((row) => row);
       setPatients(patientsList);
     } catch (error) {
-      console.error("Error fetching patients:", error);
+      alert("Error fetching patients:", error);
     }
   };
 
   useEffect(() => {
     const feedData = async () => {
-      const tableCreated = await addOrCheckTable();
+      await addOrCheckTable();
     };
 
     if (isDbReady) {
       feedData();
       updatePatients();
     }
-  }, [db, isDbReady, query]);
+  }, [db, isDbReady]);
 
   return (
     <div className="app-container">
