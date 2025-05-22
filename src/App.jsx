@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import PatientCard from "./components/patientCard";
 import PatientModal from "./components/patientModal";
+import Loader from "./components/Loader";
 import { PGlite } from "@electric-sql/pglite";
 
 function App() {
@@ -9,6 +10,8 @@ function App() {
   const [query, setQuery] = useState("");
   const [db, setDb] = useState(null);
   const [isDbReady, setIsDbReady] = useState(false);
+
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const handleQueryChange = (e) => {
     setQuery(e.target.value);
@@ -22,7 +25,7 @@ function App() {
       const patientsList = res[0].rows.map((row) => row);
       setPatients(patientsList);
     } catch (error) {
-      console.error("Error fetching patients:", error);
+      alert("Error fetching patients:", error);
     }
   };
 
@@ -56,23 +59,66 @@ function App() {
     `);
   };
 
-
   const feedData = async (patientData) => {
-    await db.exec(
-      `
-    INSERT INTO patients (firstName, lastName, dateOfBirth, gender, contactNumber, email)
-    VALUES ($1, $2, $3, $4, $5, $6);
-  `,
-      [
-        patientData.firstName,
-        patientData.lastName,
-        patientData.dateOfBirth,
-        patientData.gender,
-        patientData.contactNumber,
-        patientData.email,
-      ]
-    );
+    try {
+      await db.exec(`
+        INSERT INTO patients (firstName, lastName, dateOfBirth, gender, contactNumber, email)
+        VALUES (
+          '${patientData.firstName}', 
+          '${patientData.lastName}', 
+          '${patientData.dateOfBirth}', 
+          '${patientData.gender}', 
+          '${patientData.contactNumber}', 
+          '${patientData.email}'
+        );
+      `);
+
+      setPatients([...patients, patientData]);
+
+      //localStorage for multiple tab updates
+      localStorage.setItem("newPatient", JSON.stringify(patientData));
+
+      console.log(
+        `Patient ${patientData.firstName} ${patientData.lastName} added to database`
+      );
+    } catch (error) {
+      console.error("Error inserting patient data:", error);
+      throw error;
+    }
   };
+
+  useEffect(() => {
+    const initDb = async () => {
+      try {
+        setIsInitializing(true);
+        const dbInstance = new PGlite("idb://patient-db-test1");
+        await dbInstance.waitReady;
+        setDb(dbInstance);
+
+        console.log("Database connection established", dbInstance);
+
+        setIsDbReady(true);
+      } catch (error) {
+        console.error("Database initialization failed:", error);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    const autoRefreshOnDataUpdates = (event) => {
+      if (event.key === "newPatient") {
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener("storage", autoRefreshOnDataUpdates);
+
+    initDb();
+
+    return () => {
+      window.removeEventListener("storage", autoRefreshOnDataUpdates);
+    };
+  }, []);
 
   const updatePatients = async () => {
     if (!db) return;
@@ -87,46 +133,15 @@ function App() {
   };
 
   useEffect(() => {
-    const initDb = async () => {
-      try {
-        const dbInstance = new PGlite("idb://patient-db-test1");
-        await dbInstance.waitReady;
-        setDb(dbInstance);
-
-        console.log("Database connection established", dbInstance);
-
-        setIsDbReady(true);
-      } catch (error) {
-        console.error("Database initialization failed:", error);
-      }
-    };
-
-    const autoRefreshOnDataUpdates = (event) => {
-      if (event.key === "newPatient") {
-        //Will RELOAD the page here for multiple tabs sync
-        window.location.reload(); 
-      }
-    };
-
-    window.addEventListener("storage", autoRefreshOnDataUpdates);
-
-    initDb();
-  }, []);
-
-  
-
-  useEffect(() => {
-    const feedTable = async () => {
+    const feedData = async () => {
       await addOrCheckTable();
     };
 
     if (isDbReady) {
-      feedTable();
+      feedData();
       updatePatients();
     }
   }, [db, isDbReady]);
-
-
 
   return (
     <div className="app-container">
@@ -154,11 +169,20 @@ function App() {
         </button>
       </section>
 
-      <section className="card-container">
-        {patients.map((patient) => (
-          <PatientCard key={patient.id} patient={patient} />
-        ))}
-      </section>
+      {isInitializing ? (
+        <div className="app-container">
+          <div className="loading-container">
+            <Loader size="large" message="Initializing database..." />
+          </div>
+        </div>
+      ) : (
+        <section className="card-container">
+          {patients.map((patient) => (
+            <PatientCard key={patient.id} patient={patient} />
+          ))}
+        </section>
+      )}
+
       <PatientModal
         isOpen={isModalOpen}
         onClose={closeModal}
