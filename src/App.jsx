@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import PatientCard from "./components/patientCard";
 import PatientModal from "./components/patientModal";
-import { initialPatients } from "./Data/dummyData";
 import { PGlite } from "@electric-sql/pglite";
 
 function App() {
@@ -23,7 +22,7 @@ function App() {
       const patientsList = res[0].rows.map((row) => row);
       setPatients(patientsList);
     } catch (error) {
-      alert("Error fetching patients:", error);
+      console.error("Error fetching patients:", error);
     }
   };
 
@@ -57,31 +56,33 @@ function App() {
     `);
   };
 
+
   const feedData = async (patientData) => {
+    await db.exec(
+      `
+    INSERT INTO patients (firstName, lastName, dateOfBirth, gender, contactNumber, email)
+    VALUES ($1, $2, $3, $4, $5, $6);
+  `,
+      [
+        patientData.firstName,
+        patientData.lastName,
+        patientData.dateOfBirth,
+        patientData.gender,
+        patientData.contactNumber,
+        patientData.email,
+      ]
+    );
+  };
+
+  const updatePatients = async () => {
+    if (!db) return;
+
     try {
-      await db.exec(`
-        INSERT INTO patients (firstName, lastName, dateOfBirth, gender, contactNumber, email)
-        VALUES (
-          '${patientData.firstName}', 
-          '${patientData.lastName}', 
-          '${patientData.dateOfBirth}', 
-          '${patientData.gender}', 
-          '${patientData.contactNumber}', 
-          '${patientData.email}'
-        );
-      `);
-
-      setPatients([...patients, patientData]);
-      
-      //localSTorage for multiple tab updates
-      localStorage.setItem('newPatient', JSON.stringify(patientData));
-
-      console.log(
-        `Patient ${patientData.firstName} ${patientData.lastName} added to database`
-      );
+      const res = await db.exec("SELECT * FROM patients;");
+      const patientsList = res[0].rows.map((row) => row);
+      setPatients(patientsList);
     } catch (error) {
-      console.error("Error inserting patient data:", error);
-      throw error;
+      alert("Error fetching patients:", error);
     }
   };
 
@@ -102,7 +103,8 @@ function App() {
 
     const autoRefreshOnDataUpdates = (event) => {
       if (event.key === "newPatient") {
-        window.location.reload(); // Corrected the typo here
+        //Will RELOAD the page here for multiple tabs sync
+        window.location.reload(); 
       }
     };
 
@@ -111,28 +113,20 @@ function App() {
     initDb();
   }, []);
 
-  const updatePatients = async () => {
-    if (!db) return;
-
-    try {
-      const res = await db.exec("SELECT * FROM patients;");
-      const patientsList = res[0].rows.map((row) => row);
-      setPatients(patientsList);
-    } catch (error) {
-      alert("Error fetching patients:", error);
-    }
-  };
+  
 
   useEffect(() => {
-    const feedData = async () => {
+    const feedTable = async () => {
       await addOrCheckTable();
     };
 
     if (isDbReady) {
-      feedData();
+      feedTable();
       updatePatients();
     }
   }, [db, isDbReady]);
+
+
 
   return (
     <div className="app-container">
