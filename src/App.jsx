@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import PatientCard from "./components/patientCard";
-import PatientModal from "./components/patientModal";
+import PatientCard from "./components/PatientCard";
+import PatientModal from "./components/PatientModal";
 import Loader from "./components/Loader";
 import { PGlite } from "@electric-sql/pglite";
 
